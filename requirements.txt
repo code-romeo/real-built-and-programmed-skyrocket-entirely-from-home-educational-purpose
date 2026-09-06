@@ -1,0 +1,4 @@
+# Aerospace-grade educational rocketry dependencies
+numpy>=1.26
+matplotlib>=3.8
+pygame>=2.5
