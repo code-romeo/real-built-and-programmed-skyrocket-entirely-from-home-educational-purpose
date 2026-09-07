@@ -3,17 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import sqrt
 
+from avionics.sensors import SensorSample
 
-@dataclass
-class SensorSample:
-    accel_x: float
-    accel_y: float
-    accel_z: float
-    gyro_x: float
-    gyro_y: float
-    gyro_z: float
-    baro_altitude_m: float
-    gps_altitude_m: float | None = None
+def fuse_altitude(
+    inertial_altitude_m: float,
+    baro_altitude_m: float,
+    gps_altitude_m: float | None,
+    baro_weight: float = 0.65,
+    gps_weight: float = 0.25,
+) -> float:
+    gps_w = gps_weight if gps_altitude_m is not None else 0.0
+    inertial_w = max(0.0, 1.0 - baro_weight - gps_w)
+
+    fused = inertial_altitude_m * inertial_w + baro_altitude_m * baro_weight
+    if gps_altitude_m is not None:
+        fused += gps_altitude_m * gps_w
+    return max(0.0, fused)
 
 
 @dataclass
@@ -39,19 +44,17 @@ class FlightStateEstimator:
         self._velocity_mps += vertical_accel * dt
         self._altitude_m = max(0.0, self._altitude_m + self._velocity_mps * dt)
 
-        baro_weight = 0.65
-        gps_weight = 0.25 if sample.gps_altitude_m is not None else 0.0
-        inertial_weight = 0.10
-
-        fused_altitude = self._altitude_m * inertial_weight + sample.baro_altitude_m * baro_weight
-        if sample.gps_altitude_m is not None:
-            fused_altitude += sample.gps_altitude_m * gps_weight
+        fused_altitude = fuse_altitude(
+            inertial_altitude_m=self._altitude_m,
+            baro_altitude_m=sample.baro_altitude_m,
+            gps_altitude_m=sample.gps_altitude_m,
+        )
 
         confidence = min(1.0, max(0.0, 1.0 - abs(accel_mag - 9.80665) / 20.0))
         self._last_accel_z = sample.accel_z
 
         return FlightStateEstimate(
-            altitude_m=max(0.0, fused_altitude),
+            altitude_m=fused_altitude,
             vertical_velocity_mps=self._velocity_mps,
             vertical_acceleration_mps2=vertical_accel,
             pitch_deg=sample.gyro_x * 0.02,

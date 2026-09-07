@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from sim.physics import RocketSimulation
-from avionics.fusion import FlightStateEstimator, SensorSample
+from avionics.estimator import FlightStateEstimator
+from avionics.sensors import SensorSample
 from analysis.anomaly_detection import AnomalyDetector
 from telemetry.schema import TelemetryFrame
 from telemetry.logger import TelemetryLogger
